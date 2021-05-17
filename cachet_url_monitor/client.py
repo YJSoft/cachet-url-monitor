@@ -4,6 +4,7 @@ from typing import Optional
 
 import click
 import requests
+import json
 from yaml import dump
 from cachet_url_monitor import latency_unit, status, exceptions
 
@@ -30,7 +31,7 @@ class CachetClient(object):
     def __init__(self, url: str, token: str):
         self.url = normalize_url(url)
         self.token = token
-        self.headers = {"X-Cachet-Token": token}
+        self.headers = {"X-Cachet-Token": token, "Content-Type": "application/json"}
 
     def get_components(self):
         """Retrieves all components registered in cachet-hq"""
@@ -87,14 +88,14 @@ class CachetClient(object):
         """Pushes the status of the component to the cachet server.
         """
         params = {"id": component_id, "status": component_status.value}
-        return requests.put(f"{self.url}/components/{component_id}", params=params, headers=self.headers)
+        return requests.put(f"{self.url}/components/{component_id}", data=json.dumps(params), headers=self.headers)
 
     def push_metrics(self, metric_id: int, latency_time_unit: str, elapsed_time_in_seconds: int, timestamp: int):
         """Pushes the total amount of seconds the request took to get a response from the URL.
         """
         value = latency_unit.convert_to_unit(latency_time_unit, elapsed_time_in_seconds)
         params = {"id": metric_id, "value": value, "timestamp": timestamp}
-        return requests.post(f"{self.url}/metrics/{metric_id}/points", params=params, headers=self.headers)
+        return requests.post(f"{self.url}/metrics/{metric_id}/points", data=json.dumps(params), headers=self.headers)
 
     def push_incident(
         self,
@@ -113,7 +114,7 @@ class CachetClient(object):
             params = {"status": status.IncidentStatus.FIXED.value, "message": title}
 
             return requests.post(
-                f"{self.url}/incidents/{previous_incident_id}/updates", params=params, headers=self.headers
+                f"{self.url}/incidents/{previous_incident_id}/updates", data=json.dumps(params), headers=self.headers
             )
         elif not previous_incident_id and status_value != status.ComponentStatus.OPERATIONAL:
             # This is the first time the incident is being created.
@@ -126,7 +127,7 @@ class CachetClient(object):
                 "component_status": status_value.value,
                 "notify": True,
             }
-            return requests.post(f"{self.url}/incidents", params=params, headers=self.headers)
+            return requests.post(f"{self.url}/incidents", data=json.dumps(params), headers=self.headers)
 
 
 @click.group()
